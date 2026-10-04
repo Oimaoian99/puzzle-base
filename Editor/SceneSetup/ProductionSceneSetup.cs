@@ -1,4 +1,6 @@
 using System.IO;
+using Puzzle.Composition;
+using Puzzle.Presentation.Feedback;
 using Puzzle.Presentation.UI;
 using Puzzle.Variants.Match3.Presentation;
 using UnityEditor;
@@ -10,7 +12,7 @@ using UnityEngine.UI;
 namespace PuzzleBase.Editor.SceneSetup
 {
     /// <summary>
-    /// Editor helper to configure a production-grade 5-tier Scene Hierarchy and complete UI Canvas with a single click.
+    /// Editor helper to configure a complete production-grade 5-tier Scene Hierarchy and UI Canvas with a single click.
     /// Menu: Tools > Puzzle Base > Setup Complete Production Scene (World + UI Canvas)
     /// </summary>
     public static class ProductionSceneSetup
@@ -20,11 +22,22 @@ namespace PuzzleBase.Editor.SceneSetup
         {
             // 1. [00_APP_SERVICES]
             var appServices = GetOrCreateRoot("[00_APP_SERVICES]");
+            
+            var rootScope = Object.FindFirstObjectByType<RootLifetimeScope>();
+            if (rootScope == null)
+            {
+                var rootScopeGo = GetOrCreateChild(appServices.transform, "RootLifetimeScope");
+                rootScope = rootScopeGo.AddComponent<RootLifetimeScope>();
+            }
+            else
+            {
+                rootScope.transform.SetParent(appServices.transform);
+            }
+
             var eventSystem = Object.FindFirstObjectByType<EventSystem>();
             if (eventSystem == null)
             {
-                var esGo = new GameObject("EventSystem");
-                esGo.transform.SetParent(appServices.transform);
+                var esGo = GetOrCreateChild(appServices.transform, "EventSystem");
                 eventSystem = esGo.AddComponent<EventSystem>();
                 esGo.AddComponent<StandaloneInputModule>();
             }
@@ -35,14 +48,23 @@ namespace PuzzleBase.Editor.SceneSetup
 
             // 2. [01_SCENE_FLOW]
             var sceneFlow = GetOrCreateRoot("[01_SCENE_FLOW]");
+            var levelScope = Object.FindFirstObjectByType<LevelLifetimeScope>();
+            if (levelScope == null)
+            {
+                var levelScopeGo = GetOrCreateChild(sceneFlow.transform, "LevelLifetimeScope");
+                levelScope = levelScopeGo.AddComponent<LevelLifetimeScope>();
+            }
+            else
+            {
+                levelScope.transform.SetParent(sceneFlow.transform);
+            }
 
             // 3. [02_ENVIRONMENT & CAMERAS]
             var envCameras = GetOrCreateRoot("[02_ENVIRONMENT & CAMERAS]");
             var camera = Camera.main;
             if (camera == null)
             {
-                var camGo = new GameObject("Main Camera");
-                camGo.transform.SetParent(envCameras.transform);
+                var camGo = GetOrCreateChild(envCameras.transform, "Main Camera");
                 camera = camGo.AddComponent<Camera>();
                 camera.tag = "MainCamera";
             }
@@ -57,18 +79,12 @@ namespace PuzzleBase.Editor.SceneSetup
             // 4. [03_GAMEPLAY_WORLD]
             var gameplayWorld = GetOrCreateRoot("[03_GAMEPLAY_WORLD]");
             var boardRoot = GetOrCreateChild(gameplayWorld.transform, "BoardRoot");
-            var boardView = Object.FindFirstObjectByType<Match3BoardView>();
+            var boardView = boardRoot.GetComponent<Match3BoardView>();
             if (boardView == null)
             {
-                var bvGo = new GameObject("Match3BoardView");
-                bvGo.transform.SetParent(boardRoot.transform);
-                boardView = bvGo.AddComponent<Match3BoardView>();
+                boardView = boardRoot.AddComponent<Match3BoardView>();
                 boardView.CellSpacing = new Vector2(1.1f, 1.1f);
                 boardView.Origin = Vector2.zero;
-            }
-            else
-            {
-                boardView.transform.SetParent(boardRoot.transform);
             }
 
             // 5. [04_UI_ROOT]
@@ -77,8 +93,7 @@ namespace PuzzleBase.Editor.SceneSetup
             GameObject canvasGo;
             if (canvas == null)
             {
-                canvasGo = new GameObject("MainCanvas");
-                canvasGo.transform.SetParent(uiRoot.transform);
+                canvasGo = GetOrCreateChild(uiRoot.transform, "MainCanvas");
                 canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 var scaler = canvasGo.AddComponent<CanvasScaler>();
@@ -105,16 +120,16 @@ namespace PuzzleBase.Editor.SceneSetup
             var popupsLayer = GetOrCreateChild(canvasGo.transform, "03_Popups");
             var overlaysLayer = GetOrCreateChild(canvasGo.transform, "04_Overlays");
 
-            // Create Screen, HUD, and Popups if missing
-            GetOrCreateUIWindow<HomeScreenView>(screensLayer.transform, "HomeScreenView");
-            GetOrCreateUIWindow<GameplayHUDView>(hudLayer.transform, "GameplayHUDView");
-            GetOrCreateUIWindow<PausePopupView>(popupsLayer.transform, "PausePopupView");
-            GetOrCreateUIWindow<WinResultPopupView>(popupsLayer.transform, "WinResultPopupView");
-            GetOrCreateUIWindow<LoseResultPopupView>(popupsLayer.transform, "LoseResultPopupView");
-            GetOrCreateUIWindow<LoadingOverlayView>(overlaysLayer.transform, "LoadingOverlayView");
+            // Create Screen, HUD, Popups with CanvasGroup attached and visible in Inspector
+            GetOrCreateUIWindow<HomeScreenView>(screensLayer.transform, "HomeScreenView", startVisible: true);
+            GetOrCreateUIWindow<GameplayHUDView>(hudLayer.transform, "GameplayHUDView", startVisible: false);
+            GetOrCreateUIWindow<PausePopupView>(popupsLayer.transform, "PausePopupView", startVisible: false);
+            GetOrCreateUIWindow<WinResultPopupView>(popupsLayer.transform, "WinResultPopupView", startVisible: false);
+            GetOrCreateUIWindow<LoseResultPopupView>(popupsLayer.transform, "LoseResultPopupView", startVisible: false);
+            GetOrCreateUIWindow<LoadingOverlayView>(overlaysLayer.transform, "LoadingOverlayView", startVisible: false);
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-            Debug.Log("[ProductionSceneSetup] Complete 5-tier production Scene Hierarchy and UI Canvas created successfully!");
+            Debug.Log("[ProductionSceneSetup] Complete 5-tier production Scene Hierarchy with all scripts attached created successfully!");
         }
 
         private static GameObject GetOrCreateRoot(string name)
@@ -138,25 +153,40 @@ namespace PuzzleBase.Editor.SceneSetup
             return go;
         }
 
-        private static T GetOrCreateUIWindow<T>(Transform parent, string windowName) where T : UIWindow
+        private static T GetOrCreateUIWindow<T>(Transform parent, string windowName, bool startVisible) where T : UIWindow
         {
             var child = parent.Find(windowName);
+            GameObject go;
+            T window;
+
             if (child != null)
             {
-                var existing = child.GetComponent<T>();
-                if (existing != null) return existing;
-                return child.gameObject.AddComponent<T>();
+                go = child.gameObject;
+                window = go.GetComponent<T>() ?? go.AddComponent<T>();
+            }
+            else
+            {
+                go = new GameObject(windowName, typeof(RectTransform));
+                go.transform.SetParent(parent, false);
+                var rect = go.GetComponent<RectTransform>();
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                window = go.AddComponent<T>();
             }
 
-            var go = new GameObject(windowName, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            var window = go.AddComponent<T>();
-            go.SetActive(false); // Popups/Screens start inactive by default
+            var canvasGroup = go.GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = go.AddComponent<CanvasGroup>();
+            }
+
+            canvasGroup.alpha = startVisible ? 1f : 0f;
+            canvasGroup.blocksRaycasts = startVisible;
+            canvasGroup.interactable = startVisible;
+
+            go.SetActive(true); // Keep GameObject active so it is clearly visible in Hierarchy and inspectable
             return window;
         }
     }
