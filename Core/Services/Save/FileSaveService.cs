@@ -145,7 +145,7 @@ namespace Puzzle.Core.Services
                     Directory.CreateDirectory(directory);
                 }
 
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(_data, Newtonsoft.Json.Formatting.Indented);
+                string json = SerializeSaveData(_data);
                 string tempFilePath = _saveFilePath + ".tmp";
 
                 // Atomic write pattern: write to temporary file first, then replace target file
@@ -175,7 +175,7 @@ namespace Puzzle.Core.Services
             try
             {
                 string json = File.ReadAllText(_saveFilePath);
-                _data = Newtonsoft.Json.JsonConvert.DeserializeObject<PlayerSaveData>(json);
+                _data = DeserializeSaveData(json);
 
                 if (_data == null)
                 {
@@ -189,6 +189,85 @@ namespace Puzzle.Core.Services
                 CoreLogger.LogError($"[FileSaveService] Corrupt save file at '{_saveFilePath}'. Restoring default data. Error: {ex.Message}");
                 _data = new PlayerSaveData();
             }
+        }
+
+        public static string SerializeSaveData(PlayerSaveData data)
+        {
+            if (data == null) data = new PlayerSaveData();
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("{");
+            sb.AppendLine($"  \"SaveVersion\": {data.SaveVersion},");
+            sb.AppendLine($"  \"Coins\": {data.Coins},");
+            sb.AppendLine($"  \"HighestCompletedLevelIndex\": {data.HighestCompletedLevelIndex},");
+            sb.AppendLine("  \"LevelRecords\": [");
+            if (data.LevelRecords != null)
+            {
+                for (int i = 0; i < data.LevelRecords.Count; i++)
+                {
+                    var r = data.LevelRecords[i];
+                    if (r == null) continue;
+                    string comma = (i < data.LevelRecords.Count - 1) ? "," : "";
+                    string escapedId = (r.LevelId ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+                    sb.AppendLine($"    {{\"LevelId\": \"{escapedId}\", \"Stars\": {r.Stars}, \"HighScore\": {r.HighScore}, \"IsCompleted\": {(r.IsCompleted ? "true" : "false")}}}{comma}");
+                }
+            }
+            sb.AppendLine("  ]");
+            sb.AppendLine("}");
+            return sb.ToString();
+        }
+
+        public static PlayerSaveData DeserializeSaveData(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new PlayerSaveData();
+
+            string trimmed = json.Trim();
+            if (!trimmed.StartsWith("{") || !trimmed.EndsWith("}"))
+            {
+                throw new FormatException("JSON structure is malformed: missing root object braces.");
+            }
+
+            var data = new PlayerSaveData();
+
+            var matchVersion = System.Text.RegularExpressions.Regex.Match(json, @"""SaveVersion""\s*:\s*(\d+)");
+            if (matchVersion.Success && int.TryParse(matchVersion.Groups[1].Value, out int version))
+            {
+                data.SaveVersion = version;
+            }
+
+            var matchCoins = System.Text.RegularExpressions.Regex.Match(json, @"""Coins""\s*:\s*(-?\d+)");
+            if (matchCoins.Success && int.TryParse(matchCoins.Groups[1].Value, out int coins))
+            {
+                data.Coins = coins;
+            }
+
+            var matchHighest = System.Text.RegularExpressions.Regex.Match(json, @"""HighestCompletedLevelIndex""\s*:\s*(-?\d+)");
+            if (matchHighest.Success && int.TryParse(matchHighest.Groups[1].Value, out int highest))
+            {
+                data.HighestCompletedLevelIndex = highest;
+            }
+
+            var recordMatches = System.Text.RegularExpressions.Regex.Matches(json, @"\{[^{}]*""LevelId""[^{}]*\}");
+            foreach (System.Text.RegularExpressions.Match rm in recordMatches)
+            {
+                string block = rm.Value;
+                var idMatch = System.Text.RegularExpressions.Regex.Match(block, @"""LevelId""\s*:\s*""([^""]*)""");
+                var starsMatch = System.Text.RegularExpressions.Regex.Match(block, @"""Stars""\s*:\s*(\d+)");
+                var scoreMatch = System.Text.RegularExpressions.Regex.Match(block, @"""HighScore""\s*:\s*(\d+)");
+                var completedMatch = System.Text.RegularExpressions.Regex.Match(block, @"""IsCompleted""\s*:\s*(true|false)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (idMatch.Success)
+                {
+                    string levelId = idMatch.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\");
+                    int stars = starsMatch.Success && int.TryParse(starsMatch.Groups[1].Value, out int s) ? s : 0;
+                    int score = scoreMatch.Success && int.TryParse(scoreMatch.Groups[1].Value, out int sc) ? sc : 0;
+                    bool isCompleted = completedMatch.Success && bool.TryParse(completedMatch.Groups[1].Value, out bool c) && c;
+
+                    data.LevelRecords.Add(new LevelRecord(levelId, stars, score, isCompleted));
+                }
+            }
+
+            return data;
         }
 
         public void ResetSave()
