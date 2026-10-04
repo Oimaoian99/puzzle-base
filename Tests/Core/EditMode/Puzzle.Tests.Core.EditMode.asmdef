@@ -1,0 +1,22 @@
+{
+    "name": "Puzzle.Tests.Core.EditMode",
+    "rootNamespace": "Puzzle.Tests.Core.EditMode",
+    "references": [
+        "Puzzle.Core"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

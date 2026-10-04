@@ -1,0 +1,27 @@
+{
+    "name": "Puzzle.Tests.Variants",
+    "rootNamespace": "Puzzle.Tests.Variants",
+    "references": [
+        "Puzzle.Core",
+        "Puzzle.Variants.Link",
+        "Puzzle.Variants.Match3",
+        "Puzzle.Presentation",
+        "Puzzle.Composition",
+        "VContainer"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

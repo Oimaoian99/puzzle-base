@@ -1,0 +1,21 @@
+{
+  "name": "com.puzzlebase",
+  "displayName": "Puzzle Game Base",
+  "version": "1.0.0",
+  "unity": "6000.0",
+  "description": "Production-ready, pure C# modular puzzle game framework for Unity supporting Link/Line, Match-3, and custom variants.",
+  "dependencies": {
+    "jp.hadashikick.vcontainer": "file:jp.hadashikick.vcontainer",
+    "com.unity.ugui": "2.0.0"
+  },
+  "keywords": [
+    "puzzle",
+    "match3",
+    "link",
+    "vcontainer",
+    "architecture"
+  ],
+  "author": {
+    "name": "Puzzle Base Team"
+  }
+}

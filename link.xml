@@ -1,0 +1,6 @@
+<linker>
+  <!-- Managed Code Stripping preservation rules for Puzzle Game Base -->
+  <assembly fullname="Puzzle.Core" preserve="all" />
+  <assembly fullname="Puzzle.Composition" preserve="all" />
+  <assembly fullname="VContainer" preserve="all" />
+</linker>
