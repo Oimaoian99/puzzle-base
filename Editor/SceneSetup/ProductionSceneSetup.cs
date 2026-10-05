@@ -17,8 +17,13 @@ namespace PuzzleBase.Editor.SceneSetup
     /// </summary>
     public static class ProductionSceneSetup
     {
-        [MenuItem("Tools/Puzzle Base/Setup Complete Production Scene (World + UI Canvas)", priority = 220)]
+        [MenuItem("Tools/Puzzle Base/Scene Setup/Setup 5-Tier Hierarchy in Current Scene", priority = 220)]
         public static void SetupCompleteProductionScene()
+        {
+            BuildProductionHierarchy();
+        }
+
+        public static void BuildProductionHierarchy()
         {
             // 1. [00_APP_SERVICES]
             var appServices = GetOrCreateRoot("[00_APP_SERVICES]");
